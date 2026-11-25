@@ -7,6 +7,7 @@ import { TIERS } from "@/lib/pricing-data";
 import { supabase } from "@/integrations/supabase/client";
 import { buildWa } from "@/lib/leads";
 import { track } from "@/lib/analytics";
+import { SITE_URL } from "@/lib/seo";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as { from: (t: string) => any };
@@ -173,7 +174,7 @@ function ProposalDocument({ doc, req, aiWritten, onEdit }: { doc: ProposalDoc; r
               </table>
             </div>
           )}
-          <p className="mt-4 text-xs text-muted-foreground">Prices in US dollars as published at emmaforyou.lovable.app/pricing on {date}. This proposal is valid until {validUntil}. Month-to-month; ad spend is paid directly to the platforms; larger projects can be split into 2–3 payments.</p>
+          <p className="mt-4 text-xs text-muted-foreground">Prices in US dollars as published at {SITE_URL.replace(/^https?:\/\//, "")}/pricing on {date}. This proposal is valid until {validUntil}. Month-to-month; ad spend is paid directly to the platforms; larger projects can be split into 2–3 payments.</p>
         </section>
         <section>
           <h3 className="font-display text-lg font-semibold">How we'll measure progress</h3>

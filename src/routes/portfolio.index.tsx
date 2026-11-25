@@ -13,6 +13,7 @@ import { ADS, AUTOMATIONS, FEATURED, PROJECTS, SOCIAL_BEFORE_AFTER, VIDEOS, find
 import { buildWa } from "@/lib/leads";
 import PublishingConcepts from "@/components/publishing/PublishingConcepts";
 import { pageHead, breadcrumbLd, itemListLd } from "@/lib/seo";
+import ShowcaseStrip from "@/components/showcase/ShowcaseStrip";
 
 export const Route = createFileRoute("/portfolio/")({
   component: PortfolioPage,
@@ -237,6 +238,7 @@ function PortfolioPage() {
             </div>
           </div>
         </section>
+        <ShowcaseStrip inset min={1} title="Built by visitors with our AI tools (not client work)" />
       </main>
       <Footer />
     </div>

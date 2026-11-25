@@ -12,11 +12,12 @@ import { adminDb } from "@/lib/ai/guard";
 import { bodyOverlap, candidates, cleanSources, commentSignals, figuresNotInSources, dailySlot, estimateCost, fingerprint, formatFor, localDay, optOutIntent, sanitizeLinks, scoreAgents, screenReply, sensitive, sharesAchievement, similarity, stripStock, turnsCustomerAway, unsourcedClaims, zonedTime, type AgentLite } from "./logic";
 import { allowedPaths, catalogueKnowledge, retrieve } from "./knowledge";
 import { ALL_SOLUTIONS } from "@/lib/solutions";
+import { SITE_URL } from "@/lib/seo";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Db = any;
 const TIME_BUDGET_MS = 100_000;
-const SITE_HOST = "emmaforyou.lovable.app";
+const SITE_HOST = new URL(SITE_URL).host;
 const STAGES = ["new", "needs_clarification", "qualified", "service_recommended", "consultation_requested", "quote_requested", "awaiting_human", "won", "lost", "followup_scheduled", "not_suitable"];
 
 export interface Agent extends AgentLite {

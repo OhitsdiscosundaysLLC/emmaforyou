@@ -3745,6 +3745,7 @@ export type Database = {
           email: string | null
           goal: string | null
           id: string
+          details: Json | null
           language: string | null
           location: string | null
           name: string | null
@@ -3767,6 +3768,7 @@ export type Database = {
           email?: string | null
           goal?: string | null
           id?: string
+          details?: Json | null
           language?: string | null
           location?: string | null
           name?: string | null
@@ -3789,6 +3791,7 @@ export type Database = {
           email?: string | null
           goal?: string | null
           id?: string
+          details?: Json | null
           language?: string | null
           location?: string | null
           name?: string | null

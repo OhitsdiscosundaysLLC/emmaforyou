@@ -3,9 +3,10 @@ import { z } from "zod";
 import { fallbackPriorities, scorePillars, type AuditCheck, type AuditPriority, type AuditResult, type Vitals } from "../audit";
 import { aiText, checkLimits, checkOrigin, extractJson, readJson, refundLimit } from "./guard";
 import { signContent } from "./content-sign";
+import { SITE_URL } from "@/lib/seo";
 
 const schema = z.object({ url: z.string().trim().min(4).max(300) });
-const UA = "Mozilla/5.0 (compatible; EmmaForYouAudit/1.0; +https://emmaforyou.lovable.app/website-audit)";
+const UA = `Mozilla/5.0 (compatible; EmmaForYouAudit/1.0; +${SITE_URL}/website-audit)`;
 /** Some hosts refuse unknown bots; retry once as an ordinary browser would ask. */
 const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36";
 const MAX_HTML = 2_000_000;

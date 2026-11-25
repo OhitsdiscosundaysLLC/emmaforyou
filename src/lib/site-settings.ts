@@ -75,6 +75,8 @@ export function useFlag(id: string, fallback = true): boolean {
  * `default` is what the code does when no setting exists.
  */
 export const FEATURES: { id: string; name: string; where: string; status: "live" | "beta" | "prototype"; default: boolean }[] = [
+  { id: "home-audiences", name: "Who we help: pathways for local businesses, online stores, communities, startups and AI", where: "Homepage", status: "live", default: true },
+  { id: "home-quick-enquiry", name: "60-second enquiry form (saved to Leads with its source)", where: "Homepage", status: "live", default: true },
   { id: "home-explorer", name: "Service explorer map", where: "Homepage", status: "live", default: true },
   { id: "home-finder", name: "Solution finder", where: "Homepage", status: "live", default: true },
   { id: "home-prototype", name: "Free prototype builder", where: "Homepage", status: "beta", default: true },

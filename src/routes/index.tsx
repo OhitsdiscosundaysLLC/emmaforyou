@@ -30,6 +30,8 @@ import ToolsHub from "../components/home/ToolsHub";
 import PublishingSection from "../components/home/PublishingSection";
 import InternsSection from "../components/home/InternsSection";
 import ResultsTicker from "../components/home/ResultsTicker";
+import AudiencePaths from "../components/home/AudiencePaths";
+import QuickEnquiry from "../components/home/QuickEnquiry";
 import NicheShowcase from "../components/NicheShowcase";
 import MissionSection from "../components/MissionSection";
 import WaitlistSection from "../components/WaitlistSection";
@@ -38,7 +40,7 @@ import TrustBadges from "../components/home/TrustBadges";
 import CountdownUrgency from "../components/home/CountdownUrgency";
 import { useI18n } from "../lib/i18n";
 import { homeExperienceCopy } from "../lib/home-experience-copy";
-import { CheckCircle2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, MessageCircle } from "lucide-react";
 import { pageHead, itemListLd, HOME_ALTERNATES } from "@/lib/seo";
 import { SERVICES } from "@/lib/services-data";
 
@@ -52,7 +54,7 @@ export const Route = createFileRoute("/")({
     pageHead({
       title: "EmmaForYou — AI Automation, Websites & Digital Growth Agency",
       description: "EmmaForYou builds AI chat and booking automation, websites, online stores, email, social and ads for growing businesses in Nigeria, the USA, Europe and Africa.",
-      ogDescription: "500+ businesses transformed. Join the waitlist.",
+      ogDescription: "Websites, online stores, AI agents and automation for local businesses, ecommerce brands and communities. Get a free growth plan or build a free prototype in a minute.",
       path: "/",
       alternates: HOME_ALTERNATES,
       jsonLd: [
@@ -85,7 +87,7 @@ function HomePage() {
                 transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
               >
                 <span className="hero-kicker-dot" aria-hidden="true" />
-                AI-native growth studio for ambitious businesses
+                {hx.kicker}
               </motion.p>
               <h1 className="hero-ink-title">
                 <KineticText text={`${t("hero_title_1")} ${t("hero_title_2")} ${t("hero_title_3")}${t("hero_title_4")}.`} shine={t("hero_title_4").split(" ")} />
@@ -105,11 +107,14 @@ function HomePage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.28 }}
               >
-                <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="btn-gold inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-[15px]">
-                  {t("cta_start")}
+                <a href="#enquire" data-track="hero_get_plan" className="btn-gold inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-[15px]">
+                  {hx.heroPlan}<ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </a>
                 <a href="#prototype" data-track="hero_try_prototype" className="hero-ghost-btn">
                   {hx.heroTry}
+                </a>
+                <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" data-track="hero_whatsapp" className="inline-flex w-full items-center gap-1.5 text-sm font-medium text-white/75 underline-offset-4 hover:text-white hover:underline sm:w-auto">
+                  <MessageCircle className="h-4 w-4" aria-hidden="true" />{hx.heroWa}
                 </a>
               </motion.div>
               <motion.ul
@@ -137,33 +142,37 @@ function HomePage() {
           <a href="#work" className="hero-x-cue" aria-label="Scroll to selected work"><span aria-hidden="true" /></a>
         </section>
 
+        {/* Conversion journey: understand the offer → "this is for me" → real proof → live AI output → services →
+            how we work → tools → trust → a 60-second enquiry. Owner switches: control room → Content → Homepage. */}
         <ResultsTicker />
-        <GrowthStory />
+        <Flag id="home-audiences"><AudiencePaths /></Flag>
         <SelectedWork />
+        <Flag id="home-showcase"><HomeShowcase title={hx.showcaseTitle} /></Flag>
+        <Flag id="home-prototype"><PrototypeBuilder /></Flag>
+        <ServicesSection />
+        <GrowthStory />
         <Flag id="home-tools"><ToolsHub /></Flag>
         <SocialProofBar />
-        <Flag id="home-prototype"><PrototypeBuilder /></Flag>
-        <Flag id="home-showcase"><HomeShowcase /></Flag>
         <TransformationSlider />
-        <ProblemSection />
-        <ServicesSection />
-        <Flag id="home-publishing"><PublishingSection /></Flag>
         <Flag id="home-explorer"><ServiceExplorer /></Flag>
-        <Flag id="home-finder"><SolutionFinder /></Flag>
         <NicheShowcase />
         <AnalyserTeaser />
         <RoiSection />
         <ComparisonTable />
+        <Flag id="home-publishing"><PublishingSection /></Flag>
+        <AboutTeaser />
         <Flag id="home-stats"><StatsSection /></Flag>
         <Flag id="home-testimonials"><TestimonialsPreview /></Flag>
         <Flag id="home-trust"><TrustBadges /></Flag>
-        <AboutTeaser />
-        <MissionSection />
         <Flag id="home-interns"><InternsSection /></Flag>
-        <Flag id="home-countdown"><CountdownUrgency /></Flag>
-        <IntakeSection />
+        <Flag id="home-quick-enquiry"><QuickEnquiry /></Flag>
         <StrategyCallSection />
+        <IntakeSection />
         <FaqAccordion />
+        <ProblemSection />
+        <Flag id="home-finder"><SolutionFinder /></Flag>
+        <MissionSection />
+        <Flag id="home-countdown"><CountdownUrgency /></Flag>
         <Flag id="home-waitlist"><WaitlistSection /></Flag>
       </main>
       <Footer />
@@ -173,11 +182,11 @@ function HomePage() {
 }
 
 /** "Made on EmmaForYou": live counters from the tools + the newest showcase items (hides when there are too few). */
-function HomeShowcase() {
+function HomeShowcase({ title }: { title: string }) {
   return (
-    <div className="pb-6">
+    <div className="pb-6 pt-10" id="made-with-ai">
       <ShowcaseCounters className="mx-auto max-w-5xl px-5" />
-      <ShowcaseStrip min={1} />
+      <ShowcaseStrip min={1} limit={12} title={title} />
     </div>
   );
 }

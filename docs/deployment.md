@@ -1,6 +1,12 @@
+> **Update (Nov 2026):** the repository moved to `OhitsdiscosundaysLLC/emmaforyou` and the Vercel project `emmaforyou`
+> is now linked to it through Vercel's GitHub integration. Pushes to `main` deploy production automatically; every
+> other branch and pull request gets a preview deployment. The old GitHub Actions deploy workflow was removed (it
+> would have deployed twice). Vercel uses its own free Supabase project (`aobcoawteallsvmcynvm`); Lovable keeps
+> Lovable Cloud. Canonical address: `VITE_SITE_URL` (currently https://emmaforyou.vercel.app).
+
 # Deployments: Lovable and Vercel (one codebase)
 
-The same GitHub repository (`Emmy-ints/emmaforyou`, branch `main`) deploys to two hosts. Nothing is
+The same GitHub repository (`OhitsdiscosundaysLLC/emmaforyou`, branch `main`) deploys to two hosts. Nothing is
 forked or duplicated; every commit goes to both.
 
 | | Lovable | Vercel |

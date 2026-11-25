@@ -6,6 +6,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { generateRefCode, submitAffiliate, buildWa } from "@/lib/leads";
 import { pageHead, breadcrumbLd } from "@/lib/seo";
+import { SITE_URL } from "@/lib/seo";
 
 export const Route = createFileRoute("/affiliate")({
   component: AffiliatePage,
@@ -27,7 +28,7 @@ function AffiliatePage() {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [code, setCode] = useState<string | null>(null);
-  const link = code ? `https://emmaforyou.lovable.app/?ref=${code}` : "";
+  const link = code ? `${SITE_URL}/?ref=${code}` : "";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

@@ -2,17 +2,13 @@ import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
 import { prefersReduced } from "@/lib/motion";
 import { ClaimGate, ClaimTag } from "../future/ClaimTag";
+import { PROJECTS, projectSlug } from "@/lib/portfolio-data";
 
-const RESULTS = [
-  "🇳🇬 Fashion store in Lagos: +312% website traffic",
-  "🇺🇸 Real estate agent in Maryland: 47 new leads generated",
-  "🇬🇧 Course creator in London: £18,000 course launch",
-  "🇩🇪 Auto dealer in Halle: 3x more test drive bookings",
-  "🇳🇬 Clinic in Abuja: 86 new Google reviews added",
-  "🇿🇦 Fitness studio in Cape Town: memberships doubled in 60 days",
-  "🇬🇭 Fashion brand in Accra: first 1,000 Instagram followers",
-  "🇳🇬 Restaurant in Port Harcourt: fully booked every weekend",
-];
+/**
+ * Client results come only from the owner's records in portfolio-data (each links to its project page), so the
+ * strip never shows an outcome that isn't on file.
+ */
+const RESULTS = PROJECTS.map((p) => ({ what: p.outcome, where: `${p.name} · ${p.category}`, href: `/portfolio/${projectSlug(p.name)}` }));
 const MS = 4000;
 
 /**
@@ -32,7 +28,7 @@ function Ticker() {
   useEffect(() => { if (prefersReduced()) setAuto(false); }, []);
   const running = auto && !paused && !hold;
   const step = (d: number) => setI((x) => (x + d + RESULTS.length) % RESULTS.length);
-  const [where, what] = RESULTS[i].split(":");
+  const { what, where, href } = RESULTS[i];
 
   return (
     <div className="rt" onPointerEnter={() => setHold(true)} onPointerLeave={() => setHold(false)} onFocus={() => setHold(true)} onBlur={() => setHold(false)}>
@@ -40,7 +36,7 @@ function Ticker() {
         <span className="rt-label"><span className="rt-live" aria-hidden="true" />Client results <ClaimTag id="results-ticker" /></span>
         <div className="rt-window" aria-live={running ? "off" : "polite"}>
           <p key={i} className="rt-item">
-            <span className="rt-what">{what?.trim()}</span>
+            <a href={href} className="rt-what hover:underline" data-track="ticker_result">{what}</a>
             <span className="rt-where">— {where}</span>
           </p>
         </div>

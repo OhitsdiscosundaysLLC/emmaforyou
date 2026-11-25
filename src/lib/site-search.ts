@@ -32,7 +32,8 @@ const TOOLS: SearchDoc[] = [
 ];
 
 let DOCS: SearchDoc[] | null = null;
-function docs(): SearchDoc[] {
+/** Every answer document the site search uses (also the base of Ask Emma's grounded answers). */
+export function docs(): SearchDoc[] {
   if (DOCS) return DOCS;
   const out: SearchDoc[] = [...TOOLS];
   for (const c of CATEGORIES) for (const it of c.items) out.push({ kind: "Answer", title: it.q, answer: it.a, href: "/faq" });
@@ -51,7 +52,7 @@ function docs(): SearchDoc[] {
 }
 
 const STOP = new Set("a an the is are am be to of in on for and or with my our your you we i it can do does how what which who when where why much many me us this that there their them will would should could get have has about from at by as if so just any some".split(" "));
-const SYN: Record<string, string[]> = {
+export const SYN: Record<string, string[]> = {
   cost: ["price", "pricing", "plan", "budget", "fee", "charge"], price: ["cost", "pricing", "plan"], cheap: ["price", "budget", "starter"],
   website: ["site", "web", "landing"], site: ["website"], chatbot: ["ai", "automation", "assistant", "bot"], bot: ["chatbot", "ai", "automation"],
   ai: ["automation", "chatbot"], whatsapp: ["chat", "message", "automation"], shop: ["store", "ecommerce", "shopify"], store: ["ecommerce", "shopify", "shop"],
@@ -60,8 +61,8 @@ const SYN: Record<string, string[]> = {
   app: ["mobile", "application"], email: ["newsletter", "mail"], refund: ["guarantee", "money"], contact: ["whatsapp", "call", "email"],
 };
 
-const stem = (w: string) => w.replace(/(ings|ing|ies|es|ed|s)$/, (m) => (m === "ies" ? "y" : ""));
-function terms(text: string): string[] {
+export const stem = (w: string) => w.replace(/(ings|ing|ies|es|ed|s)$/, (m) => (m === "ies" ? "y" : ""));
+export function terms(text: string): string[] {
   return text.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter((w) => w.length > 1 && !STOP.has(w)).map(stem);
 }
 

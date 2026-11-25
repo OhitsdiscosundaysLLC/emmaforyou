@@ -6,6 +6,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { pageHead, breadcrumbLd } from "@/lib/seo";
 import { TIERS } from "@/lib/pricing-data";
+import ShowcaseStrip from "@/components/showcase/ShowcaseStrip";
 
 export const Route = createFileRoute("/pricing")({
   component: PricingPage,
@@ -114,6 +115,7 @@ function PricingPage() {
             </div>
           </div>
         </section>
+        <ShowcaseStrip inset min={1} title="Made with our free AI tools this week" />
       </main>
       <Footer />
     </>

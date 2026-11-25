@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import ShowcaseStrip from "@/components/showcase/ShowcaseStrip";
 import { KineticText } from "@/components/future/Kinetic";
 import { hueForCategory } from "@/lib/solution-hues";
 import { useMemo, useState } from "react";
@@ -97,6 +98,7 @@ function Page() {
             <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{SOLUTION_CATEGORIES.filter((x) => x.slug !== c.slug).map((x) => <li key={x.slug}><Link to="/solutions/$category" params={{ category: x.slug }} style={{ ["--hue" as string]: hueForCategory(x.slug) }} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 hover:border-[var(--emma-violet)]"><span className="sol-icon sol-icon-xs" aria-hidden="true">{x.icon}</span><span className="text-sm font-semibold">{x.name}</span></Link></li>)}</ul>
           </section>
         </div>
+        <ShowcaseStrip />
       </main>
       <Footer />
     </div>

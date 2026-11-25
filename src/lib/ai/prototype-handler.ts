@@ -1,11 +1,12 @@
 import { createServerOnlyFn } from "@tanstack/react-start";
-import { prototypeRequestSchema, type PrototypeRequest } from "../prototype";
+import { cleanGeneratedHtml, prototypeRequestSchema, type PrototypeRequest } from "../prototype";
 import { createResponsesCall } from "./responses";
 import { getLovableAiGatewayResponseHeaders } from "./run-id.ts";
 import { aiProvider, classifyFailure, visitorSalt, type ProviderFailure } from "./provider";
 import { signPrototype } from "./proto-sign";
 import { buildInstructions, buildUserMessage } from "./prototype-prompts";
 import { adminDb, memoryLimit, memoryRecord } from "./guard";
+import { publishShowcaseItem, removeShowcaseItem } from "./showcase-publish";
 
 export const handlePrototype = createServerOnlyFn(async (request: Request) => {
   const origin = request.headers.get("origin");
@@ -39,8 +40,11 @@ export const handlePrototype = createServerOnlyFn(async (request: Request) => {
   const visitorHash = await hashVisitor(request, visitorSalt());
   // Automatic repairs (the preview reported a script error) have their own small allowance, so a glitch
   // doesn't use up the visitor's prototypes.
-  const kinds = input.repair ? ["repair"] : ["new", "refine"];
-  const perVisitor = input.repair ? REPAIRS_PER_VISITOR_PER_HOUR : PER_VISITOR_PER_HOUR;
+  // New builds, refinements and automatic repairs each have their own allowance, so a visitor can keep
+  // improving a prototype without using up their new builds.
+  const kinds = input.repair ? ["repair"] : input.refinement ? ["refine"] : ["new"];
+  const perVisitor = input.repair ? REPAIRS_PER_VISITOR_PER_HOUR : input.refinement ? REFINES_PER_VISITOR_PER_HOUR : PER_VISITOR_PER_HOUR;
+  const globalCap = input.refinement && !input.repair ? GLOBAL_REFINES_PER_HOUR : GLOBAL_PER_HOUR;
   const since = new Date(Date.now() - HOUR_MS).toISOString();
   const [{ data: mine, error: mineError }, { count: everyone, error: allError }] = await Promise.all([
     // Only prototype runs count here; other tools log their own kinds in the same table.
@@ -48,23 +52,23 @@ export const handlePrototype = createServerOnlyFn(async (request: Request) => {
     supabaseAdmin.from("prototype_generations").select("id", { count: "exact", head: true }).in("kind", kinds).gte("created_at", since),
   ]);
   const dbDown = Boolean(stateError || mineError || allError);
-  const mem = dbDown ? memoryLimit(`proto:${kinds.join("+")}`, visitorHash, perVisitor, GLOBAL_PER_HOUR) : null;
+  const mem = dbDown ? memoryLimit(`proto:${kinds.join("+")}`, visitorHash, perVisitor, globalCap) : null;
   const usedCount = mem ? mem.used : (mine?.length ?? 0);
   const totalCount = mem ? mem.total * 2 : (everyone ?? 0);
   if (usedCount >= perVisitor) {
     const oldest = mem ? (mem.oldest ?? Date.now()) : new Date(mine![0].created_at).getTime();
     const minutes = Math.max(1, Math.ceil((oldest + HOUR_MS - Date.now()) / 60000));
     return Response.json(
-      { message: input.repair ? "We couldn't fix this prototype automatically right now. Try Regenerate, or chat with us on WhatsApp." : `You've used your ${PER_VISITOR_PER_HOUR} free prototypes for this hour. You can create more in about ${minutes} minute${minutes === 1 ? "" : "s"} — or chat with us on WhatsApp and we'll build the real thing.`, retryAfterMinutes: minutes },
+      { message: input.repair ? "We couldn't fix this prototype automatically right now. Try Regenerate, or chat with us on WhatsApp." : input.refinement ? `You've made ${REFINES_PER_VISITOR_PER_HOUR} changes this hour. You can make more in about ${minutes} minute${minutes === 1 ? "" : "s"}, or chat with us on WhatsApp and we'll build the real thing.` : `You've used your ${PER_VISITOR_PER_HOUR} free prototypes for this hour. You can create more in about ${minutes} minute${minutes === 1 ? "" : "s"} — or chat with us on WhatsApp and we'll build the real thing.`, retryAfterMinutes: minutes },
       { status: 429, headers: { "Retry-After": String(minutes * 60) } },
     );
   }
-  if (totalCount >= GLOBAL_PER_HOUR) {
+  if (totalCount >= globalCap) {
     return Response.json({ message: "The prototype builder is very busy right now. Please try again in a little while." }, { status: 429, headers: { "Retry-After": "900" } });
   }
   memoryRecord(`proto:${kinds.join("+")}`, visitorHash);
   const { data: logged } = dbDown ? { data: null } : await supabaseAdmin.from("prototype_generations").insert({ visitor_hash: visitorHash, kind: input.repair ? "repair" : input.refinement ? "refine" : "new" }).select("id").maybeSingle();
-  const remaining = input.repair ? -1 : PER_VISITOR_PER_HOUR - usedCount - 1;
+  const remaining = input.repair || input.refinement ? -1 : PER_VISITOR_PER_HOUR - usedCount - 1;
 
   let notifyReady: (response: Response | null) => void = () => {};
   const ready = new Promise<Response | null>((resolve) => { notifyReady = resolve; });
@@ -72,6 +76,9 @@ export const handlePrototype = createServerOnlyFn(async (request: Request) => {
   let failure: ProviderFailure | null = null;
   const call = createResponsesCall(request, {
     provider, model: provider.creativeModel,
+    // New builds get more thinking time for layout and design; edits and repairs stay fast.
+    reasoningEffort: input.refinement ? "low" : "medium",
+    timeoutMs: 280000,
     onResponse: async (response) => {
       if (!response.ok) {
         failure = await classifyFailure(provider, response);
@@ -102,7 +109,11 @@ export const handlePrototype = createServerOnlyFn(async (request: Request) => {
             if (part.finishReason === "content-filter") send({ type: "error", message: "This request was declined by the AI service." });
             else if (!hasText) send({ type: "error", message: "The AI service returned no prototype." });
             // The signature lets the visitor save/share exactly this HTML later (see /api/prototype-share).
-            else send({ type: "done", sig: await signPrototype(full) });
+            else {
+              const sig = await signPrototype(full);
+              const showcase = await autoPublish(request, input, full, sig);
+              send({ type: "done", sig, ...(showcase ? { showcase } : {}) });
+            }
           }
         }
       } catch (error) {
@@ -124,9 +135,44 @@ export const handlePrototype = createServerOnlyFn(async (request: Request) => {
   return new Response(stream, { headers });
 });
 
+/** Closing tags that show the model finished a usable document (same check as the builder). */
+const COMPLETE_MARKUP = /<\/(html|body|main|section|div)>\s*$/i;
+
+/**
+ * Publish a finished prototype to the public showcase from the server, unless the visitor unticked it. Runs for
+ * new builds, refinements and repairs alike; when the visitor sends the previous item's private link, that item is
+ * removed once the new version is live, so the showcase always holds the latest working version. Best effort:
+ * a showcase problem never fails the build.
+ */
+async function autoPublish(request: Request, input: PrototypeRequest, full: string, sig: string): Promise<{ slug: string; token: string; title: string; replaced: string | null } | null> {
+  const choice = input.showcase;
+  if (!choice?.show) return null;
+  try {
+    const html = cleanGeneratedHtml(full);
+    if (!COMPLETE_MARKUP.test(html)) return null;
+    const r = await publishShowcaseItem(request, {
+      kind: input.kind, sig, prompt: input.prompt, lang: input.language,
+      content: { html, plan: input.plan, pages: input.pages, platform: choice.platform ?? "ios" },
+      showBusiness: Boolean(choice.showBusiness && choice.business), business: choice.business, showSite: false,
+    });
+    if (!r.ok) return null;
+    let replaced: string | null = null;
+    if (choice.replace) {
+      const gone = await removeShowcaseItem(choice.replace.slug, choice.replace.token);
+      if (gone.removed) replaced = choice.replace.slug;
+    }
+    return { slug: r.slug, token: r.token, title: r.title, replaced };
+  } catch (e) {
+    console.error("[prototype] showcase publish", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
 const HOUR_MS = 60 * 60 * 1000;
 const PER_VISITOR_PER_HOUR = 3;
 const REPAIRS_PER_VISITOR_PER_HOUR = 3;
+const REFINES_PER_VISITOR_PER_HOUR = 10;
+const GLOBAL_REFINES_PER_HOUR = 200;
 const GLOBAL_PER_HOUR = 60;
 const BLOCK_COOLDOWN_MS = 30 * 60 * 1000;
 

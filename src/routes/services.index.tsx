@@ -3,6 +3,7 @@ import ToolShell from "../components/tools/ToolShell";
 import { EXPERTISE, SERVICES, SERVICE_TO_EXPERTISE } from "@/lib/services-data";
 import { canonicalForExpertise } from "@/lib/expertise-canonical";
 import { pageHead, breadcrumbLd, itemListLd } from "@/lib/seo";
+import ShowcaseStrip from "@/components/showcase/ShowcaseStrip";
 
 const GROUPS: { title: string; intro: string; slugs: string[] }[] = [
   { title: "Get more customers", intro: "Be found, look credible and turn interest into enquiries.", slugs: ["website-landing-pages", "seo", "paid-ads", "social-media-automation", "lead-generation", "marketing-promotion"] },
@@ -77,6 +78,7 @@ function Page() {
           </section>
         ))}
       </div>
+      <ShowcaseStrip inset min={1} title="Made with our free AI tools this week" />
     </ToolShell>
   );
 }

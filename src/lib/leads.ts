@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { track } from "@/lib/analytics";
 
 export interface LeadPayload {
-  source: "analyser_full" | "analyser_teaser" | "waitlist";
+  source: "analyser_full" | "analyser_teaser" | "waitlist" | "quick_enquiry";
   name?: string;
   email?: string;
   whatsapp?: string;
@@ -20,6 +20,8 @@ export interface LeadPayload {
   score?: number;
   recommended_services?: string[];
   language?: string;
+  /** Extra context (quick enquiry): what they asked for, consent and where they came from. */
+  details?: Record<string, unknown>;
 }
 
 const LOCAL_KEY = "emma_leads_backup";
@@ -264,4 +266,27 @@ export async function logReferralClick(referral_code: string) {
 
 export function buildWa(message: string): string {
   return `https://wa.me/message/HHGMMWMRJFYUC1?text=${encodeURIComponent(message)}`;
+}
+
+
+const ATTR_KEY = "efy_first_touch";
+
+/** First page, referrer and UTM tags of this visitor (kept for the session), for lead source tracking. */
+export function attribution(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    const saved = sessionStorage.getItem(ATTR_KEY);
+    if (saved) return JSON.parse(saved) as Record<string, string>;
+  } catch { /* ignore */ }
+  const q = new URLSearchParams(window.location.search);
+  const out: Record<string, string> = { landing: window.location.pathname.slice(0, 120) };
+  for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "gclid", "fbclid"]) {
+    const v = q.get(k); if (v) out[k] = v.slice(0, 120);
+  }
+  try {
+    const ref = document.referrer ? new URL(document.referrer) : null;
+    if (ref && ref.host !== window.location.host) out.referrer = ref.host.slice(0, 120);
+  } catch { /* ignore */ }
+  try { sessionStorage.setItem(ATTR_KEY, JSON.stringify(out)); } catch { /* ignore */ }
+  return out;
 }

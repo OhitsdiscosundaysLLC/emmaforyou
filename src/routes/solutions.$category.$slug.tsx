@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import ShowcaseStrip from "@/components/showcase/ShowcaseStrip";
 import { KineticText } from "@/components/future/Kinetic";
 import { hueForCategory } from "@/lib/solution-hues";
 import { ArrowRight, Check, MessageCircle, PlayCircle } from "lucide-react";
@@ -179,6 +180,7 @@ function Page() {
             </div>
           </div>
         </section>
+        <ShowcaseStrip />
       </main>
       <Footer />
     </div>

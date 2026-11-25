@@ -39,6 +39,18 @@ export const brandSchema = z.object({
   hasLogo: z.boolean().optional(),
 });
 
+/** Design directions a visitor can pick for a prototype (passed to the generator as art direction). */
+export const DESIGN_STYLES = [
+  { id: "modern", label: "Clean & modern", brief: "clean, modern and airy: generous white space, a crisp sans-serif type scale, subtle shadows, one strong accent colour" },
+  { id: "bold", label: "Bold & vibrant", brief: "bold and energetic: oversized headlines, saturated colour blocks and gradients, high contrast, punchy buttons" },
+  { id: "luxury", label: "Luxury & elegant", brief: "premium and elegant: dark or cream backgrounds, refined serif display type paired with a clean sans-serif, thin rules, restrained gold or metallic accents, slow subtle motion" },
+  { id: "friendly", label: "Warm & friendly", brief: "warm and approachable: soft rounded shapes, warm palette, friendly illustrations drawn in inline SVG, conversational copy" },
+  { id: "corporate", label: "Professional & trusted", brief: "professional and trustworthy: structured grid, navy/neutral palette, clear data and credentials areas, conservative typography" },
+  { id: "playful", label: "Playful & creative", brief: "playful and creative: expressive colours, rotated stickers and badges, hand-drawn style SVG doodles, lively micro-interactions" },
+] as const;
+export type DesignStyle = (typeof DESIGN_STYLES)[number]["id"];
+const STYLE_IDS = DESIGN_STYLES.map((d) => d.id) as [DesignStyle, ...DesignStyle[]];
+
 export const prototypeRequestSchema = z.object({
   kind: z.enum(["website", "app"]).default("website"),
   prompt: z.string().trim().min(8).max(500),
@@ -48,8 +60,26 @@ export const prototypeRequestSchema = z.object({
   plan: protoPlanSchema.optional(),
   pages: z.array(z.enum(WEBSITE_PAGES)).min(1).max(7).optional(),
   brand: brandSchema.optional(),
+  /** Art direction picked by the visitor (see DESIGN_STYLES). */
+  style: z.enum(STYLE_IDS).optional(),
   /** Automatic fix after the preview reported a script error (refinement = the error message). */
   repair: z.boolean().optional(),
+  /**
+   * "Select to edit": the element the visitor picked in the preview (its tag path and a trimmed copy of its markup),
+   * so the change is applied to that part only.
+   */
+  target: z.object({ path: z.string().trim().max(300), html: z.string().max(4000) }).optional(),
+  /**
+   * Public showcase choice. The server publishes the finished prototype itself (so it appears even if the visitor
+   * closes the tab); `replace` is the visitor's previous item for this prototype, removed once the new one is live.
+   */
+  showcase: z.object({
+    show: z.boolean(),
+    showBusiness: z.boolean().default(false),
+    business: z.string().trim().max(80).optional(),
+    platform: z.enum(["ios", "android"]).optional(),
+    replace: z.object({ slug: z.string().regex(/^[A-Za-z0-9]{10,16}$/), token: z.string().min(20).max(64) }).optional(),
+  }).optional(),
 }).refine((value) => !value.refinement || Boolean(value.html), { message: "A refinement needs an existing prototype." })
   .refine((value) => value.kind !== "app" || Boolean(value.plan) || Boolean(value.refinement), { message: "An app needs a plan." });
 export type PrototypeRequest = z.infer<typeof prototypeRequestSchema>;
@@ -88,6 +118,13 @@ const VIEWPORT = `<meta name="viewport" content="width=device-width,initial-scal
 /** Tells the builder (parent page) when a generated script fails, so it can repair the prototype once. */
 const REPORTER = `<script>addEventListener("error",function(e){try{parent.postMessage({efyProtoError:String(e.message||"Script error").slice(0,300)+(e.lineno?" (line "+e.lineno+")":"")},"*")}catch(_){}});</script>`;
 
+/**
+ * "Point and change": dormant until the builder posts {efyPick:true}. Then hovering outlines an element and a click
+ * reports its path and (trimmed) markup to the parent with {efyPicked}; Escape or {efyPick:false} cancels. It only
+ * ever calls parent.postMessage, so the sandbox and CSP stay as strict as before.
+ */
+const PICKER = `<script>(function(){var on=false,box=null,cur=null;function path(el){var p=[];while(el&&el.nodeType===1&&el.tagName!=="BODY"&&p.length<5){var s=el.tagName.toLowerCase();if(el.id)s+="#"+el.id;else if(el.classList.length)s+="."+[].slice.call(el.classList,0,2).join(".");var sib=el.parentElement?[].filter.call(el.parentElement.children,function(c){return c.tagName===el.tagName}):[];if(sib.length>1)s+=":nth-of-type("+(sib.indexOf(el)+1)+")";p.unshift(s);el=el.parentElement}return p.join(" > ")}function show(el){if(!box){box=document.createElement("div");box.setAttribute("data-efy-pick","");box.style.cssText="position:fixed;pointer-events:none;z-index:2147483647;border:2px solid #6d5bff;background:rgba(109,91,255,.12);border-radius:6px;transition:all .08s"}if(!box.parentNode)document.documentElement.appendChild(box);var r=el.getBoundingClientRect();box.style.left=r.left+"px";box.style.top=r.top+"px";box.style.width=r.width+"px";box.style.height=r.height+"px"}function stop(){on=false;cur=null;if(box&&box.parentNode)box.parentNode.removeChild(box);document.documentElement.style.cursor=""}addEventListener("message",function(e){var d=e.data||{};if(typeof d.efyPick==="boolean"){if(d.efyPick){on=true;document.documentElement.style.cursor="crosshair"}else stop()}});addEventListener("mouseover",function(e){if(!on)return;cur=e.target;show(cur)},true);addEventListener("click",function(e){if(!on)return;e.preventDefault();e.stopPropagation();var el=e.target;if(!el||el.nodeType!==1)return;var h=el.outerHTML||"";try{parent.postMessage({efyPicked:{path:path(el).slice(0,300),html:h.length>4000?h.slice(0,4000)+"…":h,label:(el.innerText||el.getAttribute("aria-label")||el.tagName).trim().replace(/\\s+/g," ").slice(0,80)}},"*")}catch(_){}stop()},true);addEventListener("keydown",function(e){if(on&&e.key==="Escape"){stop();try{parent.postMessage({efyPicked:null},"*")}catch(_){}}},true)})();</script>`;
+
 /** Strip stray markdown fences the model may add around its HTML. */
 export function cleanGeneratedHtml(html: string): string {
   return html.replace(/^\s*```(?:html)?\s*/i, "").replace(/```\s*$/, "").trim();
@@ -107,13 +144,13 @@ export function applyLogo(html: string, logo?: string | null): string {
 export function previewDocument(html: string, logo?: string | null): string {
   const clean = applyLogo(cleanGeneratedHtml(html), logo);
   if (/<head[\s>]/i.test(clean)) {
-    const withCsp = clean.replace(/<head([^>]*)>/i, `<head$1>${CSP}${REPORTER}`);
+    const withCsp = clean.replace(/<head([^>]*)>/i, `<head$1>${CSP}${REPORTER}${PICKER}`);
     return /name=["']viewport["']/i.test(withCsp) ? withCsp : withCsp.replace(CSP, `${CSP}${VIEWPORT}`);
   }
   if (/<html[\s>]/i.test(clean)) {
-    return clean.replace(/<html([^>]*)>/i, `<html$1><head>${CSP}${REPORTER}${VIEWPORT}</head>`);
+    return clean.replace(/<html([^>]*)>/i, `<html$1><head>${CSP}${REPORTER}${PICKER}${VIEWPORT}</head>`);
   }
-  return `<!doctype html><html><head>${CSP}${REPORTER}${VIEWPORT}</head><body>${clean}</body></html>`;
+  return `<!doctype html><html><head>${CSP}${REPORTER}${PICKER}${VIEWPORT}</head><body>${clean}</body></html>`;
 }
 
 /* ───────────────────────── Plans without AI ───────────────────────── */

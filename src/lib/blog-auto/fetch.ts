@@ -1,8 +1,9 @@
+import { SITE_URL } from "@/lib/seo";
 /**
  * Server-only fetching for the automated blog: RSS/Atom feeds and the text of source articles.
  * Only public https URLs on real hostnames are fetched, with timeouts and size caps.
  */
-const UA = "Mozilla/5.0 (compatible; EmmaForYouBlogBot/1.0; +https://emmaforyou.lovable.app/blog)";
+const UA = `Mozilla/5.0 (compatible; EmmaForYouBlogBot/1.0; +${SITE_URL}/blog)`;
 
 export function safeUrl(raw: string): URL | null {
   try {

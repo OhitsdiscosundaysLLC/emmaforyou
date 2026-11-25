@@ -18,7 +18,9 @@ export const KIND_LABEL: Record<ShowcaseKind, { one: string; many: string; tool:
 };
 
 /** Whether a kind is shown by default (visitor can untick). Makeovers and audits are about a real, existing website, so off by default. */
-export const DEFAULT_SHOW: Record<ShowcaseKind, boolean> = { app: true, website: true, emails: true, plan: true, makeover: false, audit: false };
+// Every tool result is published to the public showcase automatically (the owner's choice, Nov 2026).
+// Visitors are told before they generate and can untick it or remove the item later with their private link.
+export const DEFAULT_SHOW: Record<ShowcaseKind, boolean> = { app: true, website: true, emails: true, plan: true, makeover: true, audit: true };
 
 // Whole words only (plus plural), so "space" isn't a spa and "current" isn't rent.
 const words = (list: string) => new RegExp(`\\b(?:${list})(?:s|es)?\\b`, "i");
