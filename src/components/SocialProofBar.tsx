@@ -4,7 +4,7 @@ const ITEMS = [
   "Pharmacies", "Bakeries", "Lawyers", "Influencers", "Schools", "Logistics",
 ];
 
-const LOCATIONS = "Serving 50+ business types · Nigeria · USA · France · Germany · South Africa";
+const LOCATIONS = "Built for 50+ business types · Working with clients in Nigeria, the USA and Germany";
 
 /**
  * Two counter-moving rails of business types under a glass lens, faded at the edges. The rails pause

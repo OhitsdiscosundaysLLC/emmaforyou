@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import ShowcaseStrip from "@/components/showcase/ShowcaseStrip";
 import { KineticText } from "@/components/future/Kinetic";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
@@ -178,6 +179,7 @@ function AboutPage() {
             Work With Us →
           </a>
         </section>
+        <ShowcaseStrip />
       </main>
       <Footer />
     </>

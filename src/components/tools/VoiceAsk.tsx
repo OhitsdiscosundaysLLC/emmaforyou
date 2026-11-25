@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Loader2, Mic, MicOff, Send, Sparkles, Volume2, VolumeX, X } from "lucide-react";
+import { ArrowRight, BookOpen, CalendarDays, Loader2, MessageCircle, Mic, MicOff, RotateCcw, Send, Sparkles, Volume2, VolumeX, X } from "lucide-react";
 import { speak, stopSpeaking, useSpeechInput, canSpeak } from "@/lib/use-voice";
 import { track } from "@/lib/analytics";
 import type { SearchHit } from "@/lib/site-search";
@@ -12,7 +12,25 @@ import NextCallTimes from "./NextCallTimes";
 
 type SearchModule = typeof import("@/lib/site-search");
 type QKey = (typeof QUESTIONS)[number]["key"];
-type Msg = { role: "user" | "assistant"; content: string; links?: { label: string; path: string }[]; offline?: boolean; ask?: QKey; rec?: Recommendation };
+type Msg = {
+  role: "user" | "assistant"; content: string; links?: { label: string; path: string }[]; offline?: boolean; ask?: QKey; rec?: Recommendation;
+  /** Pages the answer came from (shown as sources). */
+  sources?: { title: string; path: string; kind: string }[];
+  /** Handoff to a person with the conversation summary prefilled. */
+  handoff?: { whatsapp: string; book: string } | null;
+  low?: boolean;
+};
+/** The chat is kept in this browser for 7 days so a returning visitor carries on where they left off. */
+const CHAT_KEY = "efy_ask_chat_v2";
+const CHAT_DAYS = 7;
+const newId = () => Array.from(crypto.getRandomValues(new Uint8Array(18)), (b) => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"[b % 64]).join("");
+function loadChat(): { id: string; messages: Msg[]; leadSaved: boolean } | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(CHAT_KEY) || "null");
+    if (!v || typeof v.id !== "string" || !Array.isArray(v.messages) || Date.now() - Number(v.at) > CHAT_DAYS * 864e5) return null;
+    return { id: v.id, messages: v.messages.slice(-30), leadSaved: Boolean(v.leadSaved) };
+  } catch { return null; }
+}
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const leadsDb = supabase as unknown as { from: (t: string) => any };
 const QUICK = "Get a recommendation in 4 quick taps";
@@ -26,6 +44,7 @@ export default function VoiceAsk() {
   const [mod, setMod] = useState<SearchModule | null>(null);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Msg[]>([{ role: "assistant", content: GREETING }]);
+  const [chatId, setChatId] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -40,6 +59,21 @@ export default function VoiceAsk() {
   const pathname = useRouterState({ select: (st) => st.location.pathname });
 
   useEffect(() => { setSpeakable(canSpeak()); }, []);
+  // Restore the last conversation (7 days), or start a new one.
+  useEffect(() => {
+    const saved = loadChat();
+    if (saved && saved.messages.length > 1) { setMessages(saved.messages); setChatId(saved.id); setLeadSaved(saved.leadSaved); }
+    else setChatId(newId());
+  }, []);
+  useEffect(() => {
+    if (!chatId || messages.length < 2) return;
+    try { localStorage.setItem(CHAT_KEY, JSON.stringify({ id: chatId, at: Date.now(), leadSaved, messages: messages.filter((m) => !m.ask).slice(-30).map(({ rec: _r, ...m }) => m) })); } catch { /* storage full or blocked */ }
+  }, [messages, chatId, leadSaved]);
+  function newChat() {
+    try { localStorage.removeItem(CHAT_KEY); } catch { /* ignore */ }
+    setMessages([{ role: "assistant", content: GREETING }]); setChatId(newId()); setAnswers({}); setAsking(null); setError(""); setHits([]);
+    track("assistant_new_chat");
+  }
   useEffect(() => {
     if (!open) { stopSpeaking(); return; }
     if (!mod) import("@/lib/site-search").then(setMod);
@@ -78,11 +112,13 @@ export default function VoiceAsk() {
     try {
       const res = await fetch("/api/assistant", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ page: pathname, leadSaved, profile: profileText(answers) || undefined, messages: history.slice(1).filter((m) => m.content.trim()).slice(-20).map(({ role, content: c }) => ({ role, content: c.slice(0, 800) })) }),
+        body: JSON.stringify({ page: pathname, leadSaved, conversationId: chatId || undefined, profile: profileText(answers) || undefined, messages: history.slice(1).filter((m) => m.content.trim()).slice(-20).map(({ role, content: c }) => ({ role, content: c.slice(0, 800) })) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || "Emma is unavailable right now.");
-      setMessages((m) => [...m, { role: "assistant", content: data.reply, links: data.links, offline: !!data.offline }]);
+      setMessages((m) => [...m, { role: "assistant", content: data.reply, links: data.links, offline: !!data.offline, sources: Array.isArray(data.sources) ? data.sources : [], handoff: data.handoff ?? null, low: data.confidence === "low" }]);
+      if (data.handoff) track("assistant_handoff_offered", { page: pathname });
+      if (data.qualification) track("assistant_qualified", { status: data.qualification, page: pathname });
       if (data.newLead) { setLeadSaved(true); track("assistant_lead", { page: pathname }); }
       if (voiceReplies || fromVoice) speak(data.reply);
     } catch (e) {
@@ -138,7 +174,7 @@ export default function VoiceAsk() {
                 <span className="grid h-9 w-9 place-items-center rounded-full bg-[var(--emma-violet)] text-white"><Sparkles className="h-4 w-4" /></span>
                 <div className="min-w-0 flex-1">
                   <h2 id="ask-title" className="text-sm font-semibold text-foreground">Emma · EmmaForYou AI assistant</h2>
-                  <p className="text-xs text-muted-foreground">Answers in seconds · a person follows up</p>
+                  <p className="text-xs text-muted-foreground">Answers from our own pages · a person takes over any time</p>
                 </div>
                 {speakable && (
                   <button onClick={() => { setVoiceReplies((v) => !v); stopSpeaking(); }} aria-pressed={voiceReplies} aria-label={voiceReplies ? "Turn spoken replies off" : "Read replies aloud"}
@@ -146,6 +182,7 @@ export default function VoiceAsk() {
                     {voiceReplies ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
                   </button>
                 )}
+                {messages.length > 1 && <button onClick={newChat} aria-label="Start a new chat" title="New chat" className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-muted"><RotateCcw className="h-4 w-4" /></button>}
                 <button onClick={() => setOpen(false)} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>
               </div>
 
@@ -155,6 +192,20 @@ export default function VoiceAsk() {
                     <div className="max-w-[85%] space-y-1.5">
                       <div className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "rounded-br-md bg-[var(--emma-violet)] text-white" : "rounded-bl-md border border-border bg-card text-foreground"}`}>{m.content}</div>
                       {m.offline && <p className="text-[11px] text-muted-foreground">Automatic reply: the AI assistant is offline right now.</p>}
+                      {m.sources && m.sources.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground" data-ask-sources>
+                          <BookOpen className="h-3 w-3" aria-hidden="true" /><span>From:</span>
+                          {m.sources.map((src) => (
+                            <Link key={src.path} to={src.path} onClick={() => { setOpen(false); track("assistant_source_click", { path: src.path }); }} className="max-w-[12rem] truncate rounded-full bg-muted px-2 py-0.5 font-medium text-foreground/80 hover:text-[var(--emma-violet)]">{src.title}</Link>
+                          ))}
+                        </div>
+                      )}
+                      {m.handoff && (
+                        <div className="flex flex-wrap gap-1.5" data-ask-handoff>
+                          <a href={m.handoff.whatsapp} target="_blank" rel="noopener noreferrer" onClick={() => track("whatsapp_click", { from: "ask_emma_handoff" })} className="inline-flex items-center gap-1.5 rounded-full bg-[#25d366] px-3 py-1.5 text-xs font-semibold text-white"><MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />Continue with Emmanuel on WhatsApp</a>
+                          <Link to="/book" onClick={() => { setOpen(false); track("assistant_handoff_book"); }} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:border-[var(--emma-violet)]"><CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />Book a free call</Link>
+                        </div>
+                      )}
                       {m.ask && asking === m.ask && i === messages.length - 1 && (
                         <div className="flex flex-wrap gap-1.5" role="group" aria-label={m.content} data-qualify={m.ask}>
                           {QUESTIONS.find((q) => q.key === m.ask)!.options.map((o) => (

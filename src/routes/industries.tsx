@@ -24,7 +24,7 @@ function Page() {
       title="Solutions for your industry"
       intro="Every industry loses customers in its own way: empty chairs, unanswered messages, abandoned carts, cold leads. Find yours to see the problems we solve and the services we'd use."
       answers={[
-        { q: "My industry isn't listed. Can you still help?", a: "Very likely. We've worked with more than 50 types of business. Take the growth assessment or book a free call and we'll tell you honestly whether we're a good fit." },
+        { q: "My industry isn't listed. Can you still help?", a: "Very likely. The site has solutions for more than 50 types of business, and most problems (missed enquiries, slow follow-up, no online bookings) are shared across industries. Take the growth assessment or book a free call and we'll tell you honestly whether we're a good fit." },
       ]}
     >
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

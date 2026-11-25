@@ -1,4 +1,5 @@
 import { createFileRoute, notFound, Link } from "@tanstack/react-router";
+import ShowcaseStrip from "@/components/showcase/ShowcaseStrip";
 import { KineticText } from "@/components/future/Kinetic";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -48,6 +49,7 @@ function ServicePage() {
     <>
       <Navbar />
       <ExpertiseTemplate data={data} />
+      <ShowcaseStrip />
       <Footer />
     </>
   );
