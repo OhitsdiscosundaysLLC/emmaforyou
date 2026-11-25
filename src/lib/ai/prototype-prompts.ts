@@ -1,5 +1,5 @@
 import type { PrototypeRequest } from "../prototype";
-import { DEFAULT_PAGES } from "../prototype";
+import { DEFAULT_PAGES, DESIGN_STYLES } from "../prototype";
 
 const LANG: Record<string, string> = { en: "English", fr: "French", es: "Spanish", de: "German" };
 
@@ -29,10 +29,26 @@ Structure:
 - Interactions work in memory: e.g. shop pages with filters and a cart with totals, booking pages with date/time selection and a demo confirmation, contact forms with validation and a "Demo: message received" confirmation, FAQ accordions, gallery lightbox.
 - Design for 375px through 1440px with professional typography, intentional colours and accessible labels. Every section's content sits inside a centred container with side padding of at least 20px at every width (text and buttons never touch the edge of the screen).`;
 
+// Quality bar, benchmarked against what visitors see from v0, Lovable and Bolt: a finished-looking product, not a wireframe.
+const DESIGN = `Design quality bar (this must look like a finished product a business would pay for, not a wireframe or template):
+- Start with a small design system in :root CSS variables: primary, accent, ink, muted, surface, border, radius and a spacing scale (4/8/12/16/24/32/48/64). Use them everywhere.
+- Typography: a clear type scale (display, h1-h3, body, small) with tight letter-spacing on large headings, 1.5-1.7 line height for body text, at most two font stacks (system fonts only).
+- Visual hierarchy: one dominant headline and one primary action per view, secondary actions visibly quieter, related items grouped in cards with consistent padding.
+- Imagery without external files: build rich visuals with layered CSS gradients, shapes and original inline SVG (product mock-ups, icons, illustrations, charts). Never leave grey placeholder boxes or "Image here".
+- Copy: specific, believable copy for this exact business (real-sounding product names, services, prices, opening hours, FAQs). No lorem ipsum, no "Feature 1". Sample people and reviews are clearly fictional demo content.
+- Polish: hover/focus/active states on every interactive element, smooth 150-250ms transitions, empty, loading and success states, visible keyboard focus, WCAG AA colour contrast.
+- Conversion: every page or screen makes the next step obvious (book, buy, enquire, sign up) and repeats it at the end.`;
+
+function styleLine(input: PrototypeRequest): string {
+  const d = DESIGN_STYLES.find((x) => x.id === input.style);
+  return d ? `Art direction chosen by the visitor: ${d.brief}.` : "";
+}
+
 export function buildInstructions(input: PrototypeRequest): string {
   const lang = `All visible copy must be in ${LANG[input.language] ?? "English"}.`;
-  if (input.kind === "app") return `${APP}\n${JS_RULES}\n${lang}\n${SAFETY}`;
-  return `${WEBSITE}\n${JS_RULES}\n${lang}\n${SAFETY}`;
+  const style = styleLine(input);
+  if (input.kind === "app") return [APP, DESIGN, style, JS_RULES, lang, SAFETY].filter(Boolean).join("\n");
+  return [WEBSITE, DESIGN, style, JS_RULES, lang, SAFETY].filter(Boolean).join("\n");
 }
 
 export function buildUserMessage(input: PrototypeRequest): string {
@@ -44,7 +60,10 @@ export function buildUserMessage(input: PrototypeRequest): string {
     return `Original idea: ${input.prompt}\nCurrent HTML:\n${input.html}\nThe prototype stops working because the browser reports this script error: ${input.refinement}\nFix the cause (and any similar mistakes) and return the complete corrected document. Change nothing else.`;
   }
   if (input.html && input.refinement) {
-    return `Original idea: ${input.prompt}\n${brand}\nCurrent HTML:\n${input.html}\nRequested change: ${input.refinement}\nReturn the complete updated document. Keep everything that already works and keep the same structure rules.`;
+    const target = input.target
+      ? `\nThe visitor selected one element in the preview and wants the change applied ONLY to it (and its children). Element path: ${input.target.path}\nIts current markup (may be trimmed):\n${input.target.html}\nLocate this element in the document, change it as requested, and leave every other part of the page exactly as it is.`
+      : "";
+    return `Original idea: ${input.prompt}\n${brand}\nCurrent HTML:\n${input.html}\nRequested change: ${input.refinement}${target}\nReturn the complete updated document. Keep everything that already works and keep the same structure rules.`;
   }
   if (input.kind === "app" && input.plan) {
     const p = input.plan;

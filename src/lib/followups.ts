@@ -1,3 +1,4 @@
+import { SITE_URL } from "@/lib/seo";
 /**
  * WhatsApp follow-up after someone uses a tool or leaves their details. The site can't send WhatsApp messages by
  * itself (that needs a WhatsApp Business API account), so the dashboard prepares each message and opens it in
@@ -62,7 +63,7 @@ function thing(l: FollowLead): string {
   }
 }
 
-export function messageFor(l: FollowLead, step: 1 | 2 | 3, site = "https://emmaforyou.lovable.app"): string {
+export function messageFor(l: FollowLead, step: 1 | 2 | 3, site = SITE_URL): string {
   const hi = `Hi ${firstName(l.name)}, it's Emmanuel from EmmaForYou.`;
   const book = `${site.replace(/\/$/, "")}/book`;
   const m = l.meta ?? {};

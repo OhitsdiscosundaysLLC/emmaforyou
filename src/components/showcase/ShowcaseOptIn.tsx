@@ -26,9 +26,9 @@ export function ShowcaseOptIn({ kind, choice, onChange, business, compact = fals
       <label htmlFor={id} className="flex items-start gap-2">
         <input id={id} type="checkbox" checked={choice.show} onChange={(e) => onChange({ ...choice, show: e.target.checked })} className="mt-0.5 h-4 w-4 accent-[var(--emma-violet)]" />
         <span>
-          Add the result to our <Link to="/showcase" className="font-semibold underline-offset-2 hover:underline">public showcase</Link>
-          {compact ? "" : kind === "audit" ? " (score and top fixes only)" : kind === "makeover" ? " (this shows your redesigned page)" : " (without your name or contact details)"}
-          . You can remove it anytime.
+          Publish the result automatically on our <Link to="/showcase" className="font-semibold underline-offset-2 hover:underline">public showcase</Link> and homepage
+          {compact ? "" : kind === "audit" ? " (score and top fixes only, not your web address)" : kind === "makeover" ? " (this shows your redesigned page)" : " (without your name or contact details)"}
+          . Untick to keep it private; you can also remove it anytime.
         </span>
       </label>
       {choice.show && business?.trim() && (

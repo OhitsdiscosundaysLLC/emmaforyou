@@ -9,6 +9,7 @@ import { SOLUTION_CATEGORIES } from "@/lib/solutions/categories";
 import { getSolutionCount } from "@/lib/solutions-server";
 import { ENGINE_TITLES } from "@/lib/solutions/engine-titles";
 import { breadcrumbLd, itemListLd, pageHead } from "@/lib/seo";
+import ShowcaseStrip from "@/components/showcase/ShowcaseStrip";
 
 const FEATURED: [string, string][] = [["business-apps", "crm"], ["websites", "booking-reservation-website"], ["ai-solutions", "ai-customer-support-agent"], ["business-apps", "ecommerce-store-app"], ["ai-solutions", "ai-document-processor"], ["automation", "appointment-reminders"]];
 const FAQS = [
@@ -110,6 +111,7 @@ function Page() {
             <div className="mt-7 flex flex-wrap justify-center gap-3"><Link to="/solutions/app-planner" className="btn-primary-gradient inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold text-white">Open the app planner</Link><Link to="/book" className="hero-ghost-btn">Book a free call</Link></div>
           </div>
         </section>
+        <ShowcaseStrip inset min={1} title="Prototypes visitors built with our AI" />
       </main>
       <Footer />
     </div>

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
+  Download,
   ImagePlus,
   LayoutTemplate,
   Loader2,
   Maximize2,
+  MousePointerClick,
   Monitor,
   Pencil,
   RotateCw,
@@ -25,9 +27,10 @@ import { MakeItReal, SaveDialog, type SavePayload } from "../prototype/SaveProto
 import { useI18n } from "@/lib/i18n";
 import { homeExperienceCopy } from "@/lib/home-experience-copy";
 import { prototypeCopy } from "@/lib/prototype-copy";
-import { DEFAULT_PAGES, WEBSITE_PAGES, cleanGeneratedHtml, previewDocument, suggestPlan, type PlanSuggestion, type ProtoKind, type ProtoPlan } from "@/lib/prototype";
+import { DEFAULT_PAGES, DESIGN_STYLES, WEBSITE_PAGES, cleanGeneratedHtml, type DesignStyle, previewDocument, suggestPlan, type PlanSuggestion, type ProtoKind, type ProtoPlan } from "@/lib/prototype";
 import { track } from "@/lib/analytics";
-import { ShowcaseOptIn, ShowcasePublished, publishToShowcase, removeFromShowcase, useShowcaseChoice } from "../showcase/ShowcaseOptIn";
+import { ShowcaseOptIn, ShowcasePublished, useShowcaseChoice } from "../showcase/ShowcaseOptIn";
+import { forgetItem, myItems, rememberItem } from "@/lib/showcase";
 
 type Device = "desktop" | "tablet" | "mobile";
 type Mode = "new" | "refine" | "regenerate" | "repair";
@@ -37,6 +40,23 @@ const DEVICES: { id: Device; icon: typeof Monitor }[] = [
   { id: "tablet", icon: Tablet },
   { id: "mobile", icon: Smartphone },
 ];
+
+/** One-tap changes, so visitors can improve a prototype without writing a prompt (benchmarked on v0/Lovable suggestions). */
+const QUICK_CHANGES: Record<ProtoKind, string[]> = {
+  website: ["Add a pricing section with 3 plans", "Add a customer reviews section", "Switch to a dark theme", "Make the hero section bolder", "Add an online booking form", "Add an FAQ section", "Make it feel more premium"],
+  app: ["Add a profile and settings screen", "Add a dark mode toggle", "Add a notifications screen", "Add a loyalty points screen", "Add an onboarding walkthrough", "Make the design more premium"],
+};
+
+/** Download the generated page as a standalone .html file the visitor owns. */
+function downloadHtml(html: string, name: string) {
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${(name || "prototype").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "prototype"}.html`;
+  document.body.appendChild(a); a.click(); a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 /** Closing tags that tell us the model produced a usable document, not a cut-off fragment. */
 const COMPLETE_MARKUP = /<\/(html|body|main|section|div)>\s*$/i;
@@ -57,7 +77,7 @@ async function readLogo(file: File): Promise<string> {
   } finally { URL.revokeObjectURL(url); }
 }
 
-interface Built { kind: ProtoKind; html: string; sig: string; prompt: string; plan?: ProtoPlan; pages?: string[] }
+interface Built { kind: ProtoKind; html: string; sig: string; prompt: string; plan?: ProtoPlan; pages?: string[]; style?: DesignStyle }
 
 export default function PrototypeBuilder() {
   const { lang } = useI18n();
@@ -71,6 +91,7 @@ export default function PrototypeBuilder() {
   const [logo, setLogo] = useState("");
   const [pages, setPages] = useState<string[]>(DEFAULT_PAGES);
   const [platform, setPlatform] = useState<Platform>("ios");
+  const [style, setStyle] = useState<DesignStyle | "">("");
   const [plan, setPlan] = useState<ProtoPlan | null>(null);
   const [planAi, setPlanAi] = useState(true);
   const [planning, setPlanning] = useState(false);
@@ -85,6 +106,9 @@ export default function PrototypeBuilder() {
   const [stage, setStage] = useState(0);
   const [device, setDevice] = useState<Device>("desktop");
   const [refining, setRefining] = useState(false);
+  /** "Point and change": the element picked in the preview, applied to the next refinement only. */
+  const [selected, setSelected] = useState<{ path: string; html: string; label: string } | null>(null);
+  const [picking, setPicking] = useState(false);
   const [change, setChange] = useState("");
   const [full, setFull] = useState(false);
   const [intake, setIntake] = useState(false);
@@ -95,11 +119,10 @@ export default function PrototypeBuilder() {
   const repairBudget = useRef(0);
   const [showChoice, setShowChoice] = useShowcaseChoice(kind);
   const [shown, setShown] = useState<string | null>(null);
-  const publishTimer = useRef<number | null>(null);
   const abort = useRef<AbortController | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => () => { abort.current?.abort(); if (publishTimer.current) window.clearTimeout(publishTimer.current); }, []);
+  useEffect(() => () => { abort.current?.abort(); }, []);
   // Industry pages link here with the idea filled in: /?proto_kind=app&proto_idea=…#prototype
   useEffect(() => {
     try {
@@ -141,31 +164,43 @@ export default function PrototypeBuilder() {
     } finally { setPlanning(false); }
   }
 
-  async function generate(mode: Mode, repairError?: string) {
+  async function generate(mode: Mode, repairError?: string, changeOverride?: string) {
+    const changeText = (changeOverride ?? change).trim();
     const base = mode === "new" ? null : built;
     const k: ProtoKind = base ? base.kind : kind;
     const idea = (base ? base.prompt : prompt).trim();
     if (busy || paused || idea.length < 8) return;
-    if (mode === "refine" && !change.trim()) return;
+    if (mode === "refine" && !changeText) return;
     if (mode === "repair" && (!base || !repairError)) return;
     const usePlan = k === "app" ? (base?.plan ?? plan) : undefined;
     if (k === "app" && !usePlan) return;
     const usePages = k === "website" ? (base?.pages ?? pages) : undefined;
+    const useStyle = (base ? base.style : style || undefined) || undefined;
     setBusy(true); setError(""); setBytes(0); setStage(0); setFixing(mode === "repair");
     if (window.innerWidth < 1024) previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     const controller = new AbortController();
+    const mine = mode !== "new" && shown ? myItems().find((x) => x.slug === shown) : undefined;
+    const replaceItem = mine ? { slug: mine.slug, token: mine.token } : null;
+    const target = mode === "refine" ? selected : null;
     abort.current = controller;
     let accumulated = "";
+    let published: { slug: string; token: string; title: string; replaced: string | null } | null = null;
     let sig = "";
     let completed = false;
     try {
       const response = await fetch("/api/prototype", {
         method: "POST", signal: controller.signal, headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          kind: k, prompt: idea, language: lang, brand,
+          kind: k, prompt: idea, language: lang, brand, ...(useStyle ? { style: useStyle } : {}),
           ...(k === "app" ? { plan: usePlan } : { pages: usePages }),
-          ...(mode === "refine" && base ? { html: base.html, refinement: change.trim() } : {}),
+          ...(mode === "refine" && base ? { html: base.html, refinement: changeText } : {}),
           ...(mode === "repair" && base ? { html: base.html, refinement: repairError, repair: true } : {}),
+          ...(mode === "refine" && target ? { target } : {}),
+          // The server publishes the finished prototype to the showcase itself (unless unticked) and replaces this
+          // visitor's previous version of it, so the showcase always shows the latest working version.
+          showcase: showChoice.show
+            ? { show: true, showBusiness: showChoice.showBusiness, business: business.trim() || undefined, platform, ...(replaceItem ? { replace: replaceItem } : {}) }
+            : { show: false },
         }),
       });
       if (!response.ok) {
@@ -190,36 +225,35 @@ export default function PrototypeBuilder() {
           const line = buffer.slice(0, pos);
           buffer = buffer.slice(pos + 1);
           if (!line.trim()) continue;
-          const event = JSON.parse(line) as { type: string; text?: string; message?: string; sig?: string };
+          const event = JSON.parse(line) as { type: string; text?: string; message?: string; sig?: string; showcase?: { slug: string; token: string; title: string; replaced: string | null } };
           if (event.type === "text" && event.text) { accumulated += event.text; setBytes(accumulated.length); setStage(2); }
-          if (event.type === "done") { completed = true; sig = event.sig ?? ""; }
+          if (event.type === "done") { completed = true; sig = event.sig ?? ""; published = event.showcase ?? null; }
           if (event.type === "error") throw new Error(event.message || "Your prototype could not be completed.");
         }
       }
       const cleaned = cleanGeneratedHtml(accumulated);
       if (!completed || !COMPLETE_MARKUP.test(cleaned)) throw new Error("The prototype was cut off before it finished. Please try again.");
-      const next: Built = { kind: k, html: cleaned, sig, prompt: idea, plan: usePlan ?? undefined, pages: usePages };
+      const next: Built = { kind: k, html: cleaned, sig, prompt: idea, plan: usePlan ?? undefined, pages: usePages, style: useStyle };
       setBuilt(next);
       setVersions((v) => {
         const base = mode === "new" ? [] : v;
         if (mode === "repair" && base.length) return [...base.slice(0, -1), { ...next, label: base[base.length - 1].label }];
-        return [...base, { ...next, label: mode === "refine" && change.trim() ? change.trim().slice(0, 40) : idea.slice(0, 40) }].slice(-8);
+        return [...base, { ...next, label: mode === "refine" && changeText ? changeText.slice(0, 40) : idea.slice(0, 40) }].slice(-8);
       });
       if (mode !== "repair") repairBudget.current = 1;
-      // Public showcase (if the visitor left it ticked). Wait a moment so a preview that reports an error is repaired first.
-      if (publishTimer.current) window.clearTimeout(publishTimer.current);
-      if (showChoice.show && sig) {
-        const previous = shown;
-        publishTimer.current = window.setTimeout(async () => {
-          publishTimer.current = null;
-          const r = await publishToShowcase({ kind: k, sig, content: { html: cleaned, plan: usePlan ?? undefined, pages: usePages, platform }, prompt: idea, business: business.trim() || undefined, choice: showChoice }, lang);
-          if (r) { if (previous) void removeFromShowcase(previous); setShown(r.slug); }
-        }, 3500);
-      }
+      // Published to the public showcase by the server (see autoPublish in prototype-handler). Keep the private
+      // remove link in this browser so the visitor can take it down.
+      if (published) {
+        rememberItem({ slug: published.slug, token: published.token, title: published.title, kind: k, at: new Date().toISOString() });
+        if (published.replaced) forgetItem(published.replaced);
+        setShown(published.slug);
+        track("showcase_published", { kind: k, auto: true, mode });
+      } else if (mode === "new") setShown(null);
+      setSelected(null); setPicking(false);
       setSaved(null);
       setFrameKey((n) => n + 1);
       setRefining(false); setChange("");
-      track(mode === "refine" ? "prototype_refined" : "prototype_generated", { mode, kind: k, chars: idea.length });
+      track(mode === "refine" ? "prototype_refined" : "prototype_generated", { mode, kind: k, chars: idea.length, style: useStyle ?? "auto", quick: Boolean(changeOverride) });
     } catch (e) {
       if (!controller.signal.aborted) {
         setError(e instanceof Error ? e.message : "Generation could not finish. Please try again later.");
@@ -233,13 +267,25 @@ export default function PrototypeBuilder() {
   const busyRef = useRef(busy); busyRef.current = busy;
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
-      const msg = (e.data as { efyProtoError?: unknown } | null)?.efyProtoError;
+      const data = e.data as { efyProtoError?: unknown; efyPicked?: unknown } | null;
+      if (data && "efyPicked" in data) {
+        const fromOurs = [...document.querySelectorAll<HTMLIFrameElement>("#prototype iframe, [role=dialog] iframe")].some((f) => f.contentWindow === e.source);
+        if (!fromOurs) return;
+        setPicking(false);
+        const v = data.efyPicked as { path?: unknown; html?: unknown; label?: unknown } | null;
+        if (v && typeof v.path === "string" && typeof v.html === "string") {
+          setSelected({ path: v.path.slice(0, 300), html: v.html.slice(0, 4000), label: String(v.label ?? "").slice(0, 80) || "Selected element" });
+          setRefining(true);
+          track("prototype_point_selected");
+        }
+        return;
+      }
+      const msg = data?.efyProtoError;
       if (typeof msg !== "string" || !builtRef.current || busyRef.current) return;
       const ours = [...document.querySelectorAll<HTMLIFrameElement>("#prototype iframe, [role=dialog] iframe")].some((f) => f.contentWindow === e.source);
       if (!ours) return;
       if (repairBudget.current > 0) {
         repairBudget.current -= 1;
-        if (publishTimer.current) { window.clearTimeout(publishTimer.current); publishTimer.current = null; }
         track("prototype_repair", { kind: builtRef.current.kind });
         void generate("repair", msg.slice(0, 300));
       } else {
@@ -276,6 +322,14 @@ export default function PrototypeBuilder() {
     </div>
   );
 
+  /** Switch the preview's element picker on/off (it only talks to us through postMessage). */
+  function togglePick() {
+    const next = !picking;
+    setPicking(next);
+    for (const f of document.querySelectorAll<HTMLIFrameElement>("#prototype iframe")) f.contentWindow?.postMessage({ efyPick: next }, "*");
+    if (next) track("prototype_point_started");
+  }
+
   const toolbar = (
     <div className="flex items-center gap-0.5">
       {showApp ? (
@@ -289,15 +343,31 @@ export default function PrototypeBuilder() {
       )}
       <span className="mx-1 h-5 border-l border-border" />
       <Button size="icon" variant="ghost" className="h-8 w-8" title={c.refine} aria-label={c.refine} disabled={!built || busy || paused} onClick={() => setRefining((s) => !s)}><Pencil className="h-4 w-4" /></Button>
+      <Button size="icon" variant={picking ? "secondary" : "ghost"} className="h-8 w-8" title="Point and change: click any part of the prototype to edit just that part" aria-label="Point and change: click any part of the prototype to edit just that part" aria-pressed={picking} disabled={!built || busy || paused} onClick={() => togglePick()} data-proto-point><MousePointerClick className="h-4 w-4" /></Button>
       <Button size="icon" variant="ghost" className="h-8 w-8" title={c.regenerate} aria-label={c.regenerate} disabled={!built || busy || paused} onClick={() => void generate("regenerate")}><RotateCw className="h-4 w-4" /></Button>
       <Button size="icon" variant="ghost" className="h-8 w-8" title={c.fullscreen} aria-label={c.fullscreen} disabled={!built} onClick={() => setFull(true)}><Maximize2 className="h-4 w-4" /></Button>
+      <Button size="icon" variant="ghost" className="h-8 w-8" title="Download HTML" aria-label="Download the prototype as an HTML file" disabled={!built || busy} onClick={() => { if (!built) return; downloadHtml(built.html, built.plan?.name ?? (business.trim() || built.prompt)); track("prototype_downloaded", { kind: built.kind }); }}><Download className="h-4 w-4" /></Button>
     </div>
   );
 
   const refineForm = refining && (
     <form className="flex flex-wrap gap-2 border-b border-border p-3" onSubmit={(e) => { e.preventDefault(); void generate("refine"); }}>
-      <input aria-label={c.change} placeholder={c.change} maxLength={500} value={change} onChange={(e) => setChange(e.target.value)} autoFocus className="min-w-0 flex-1 rounded-full border border-input bg-background px-4 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+      {picking && <p className="w-full text-xs font-semibold text-[var(--emma-violet)]" role="status">Click any part of the prototype to change just that part. Press Esc to cancel.</p>}
+      {selected && (
+        <p className="flex w-full items-center gap-2 text-xs" data-proto-selected>
+          <span className="inline-flex max-w-full items-center gap-1.5 truncate rounded-full bg-[var(--emma-violet)]/10 px-3 py-1 font-semibold text-[var(--emma-violet)]"><MousePointerClick className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />Changing only: {selected.label}</span>
+          <button type="button" className="underline-offset-2 hover:underline" onClick={() => setSelected(null)}>Whole page instead</button>
+        </p>
+      )}
+      <input aria-label={c.change} placeholder={selected ? `What should change in "${selected.label.slice(0, 30)}"?` : c.change} maxLength={500} value={change} onChange={(e) => setChange(e.target.value)} autoFocus className="min-w-0 flex-1 rounded-full border border-input bg-background px-4 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
       <Button type="submit" className="rounded-full" disabled={busy || !change.trim()}>{c.apply}</Button>
+      {built && (
+        <div className="flex w-full flex-wrap gap-1.5" role="group" aria-label="Suggested changes" data-proto-quick>
+          {QUICK_CHANGES[built.kind].map((q) => (
+            <button key={q} type="button" disabled={busy} onClick={() => { setChange(q); void generate("refine", undefined, q); }} className="example-chip text-xs">{q}</button>
+          ))}
+        </div>
+      )}
     </form>
   );
 
@@ -360,6 +430,15 @@ export default function PrototypeBuilder() {
               </div>
             </fieldset>
           )}
+          <fieldset data-proto-style>
+            <legend className="text-xs font-medium text-muted-foreground">Design style</legend>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              <button type="button" aria-pressed={style === ""} disabled={busy || planning} onClick={() => setStyle("")} className="efy-page-chip">AI picks</button>
+              {DESIGN_STYLES.map((d) => (
+                <button key={d.id} type="button" aria-pressed={style === d.id} disabled={busy || planning} onClick={() => setStyle(d.id)} className="efy-page-chip">{d.label}</button>
+              ))}
+            </div>
+          </fieldset>
           <ShowcaseOptIn kind={kind} choice={showChoice} onChange={setShowChoice} business={business} />
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs tabular-nums text-muted-foreground">{prompt.length}/500</span>

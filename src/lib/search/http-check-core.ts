@@ -1,3 +1,4 @@
+import { SITE_URL } from "@/lib/seo";
 /**
  * Pure helpers for the server-side HTTP checker: input validation (only paths on this site, so it
  * can never reach internal or third-party hosts), crawler user agents, and the light HTML reading
@@ -6,7 +7,7 @@
 
 /** Official user-agent strings, as each operator publishes them (OpenAI's checked 27 Oct 2026 at developers.openai.com/api/docs/bots). */
 export const CRAWLERS = {
-  browser: { ua: "Mozilla/5.0 (compatible; EmmaForYou-site-check/1.0; +https://emmaforyou.lovable.app)", purpose: "Plain request (no crawler identity)" },
+  browser: { ua: `Mozilla/5.0 (compatible; EmmaForYou-site-check/1.0; +${SITE_URL})`, purpose: "Plain request (no crawler identity)" },
   googlebot: { ua: "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)", purpose: "Google Search (also feeds Google's AI features)" },
   bingbot: { ua: "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)", purpose: "Bing search (also feeds Microsoft Copilot)" },
   "oai-searchbot": { ua: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot", purpose: "ChatGPT search results (not model training)" },

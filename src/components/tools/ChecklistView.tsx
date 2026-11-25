@@ -4,6 +4,7 @@ import { CheckCircle2, Download, Loader2, Lock } from "lucide-react";
 import { itemCount, type Checklist } from "@/lib/checklists";
 import { submitMagnet } from "@/lib/leads";
 import { supabase } from "@/integrations/supabase/client";
+import { SITE_URL } from "@/lib/seo";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const rpc = supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => any };
@@ -60,7 +61,7 @@ export default function ChecklistView({ c }: { c: Checklist }) {
             </ul>
           </div>
         ))}
-        {open && <p className="text-xs text-muted-foreground">{c.title} by EmmaForYou · emmaforyou.lovable.app/checklists/{c.slug}</p>}
+        {open && <p className="text-xs text-muted-foreground">{c.title} by EmmaForYou · {SITE_URL.replace(/^https?:\/\//, "")}/checklists/{c.slug}</p>}
       </section>
 
       {open ? (

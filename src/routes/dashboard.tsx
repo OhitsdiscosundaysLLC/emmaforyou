@@ -46,7 +46,7 @@ interface SiteEvent {
 
 interface Lead {
   id: string;
-  kind: "Analyser" | "Waitlist" | "Business profile" | "Quiz" | "Resource" | "ROI calculator" | "Website audit" | "Proposal signed" | "Call booked" | "Smart contract review" | "Goal planner" | "AI assistant chat" | "Exit offer" | "Contact form" | "Prototype saved" | "Ask Emma (qualified)";
+  kind: "Analyser" | "Waitlist" | "Business profile" | "Quiz" | "Resource" | "ROI calculator" | "Website audit" | "Proposal signed" | "Call booked" | "Smart contract review" | "Goal planner" | "AI assistant chat" | "Exit offer" | "Contact form" | "Prototype saved" | "Ask Emma (qualified)" | "Homepage enquiry";
   name: string;
   business: string;
   email: string;
@@ -181,7 +181,7 @@ async function loadLeads(sinceIso: string): Promise<Lead[]> {
     tdb.from("prototype_shares").select("id,created_at,slug,kind,title,prompt,name,business,whatsapp,email,suggested_plan,views").gte("created_at", sinceIso).order("created_at", { ascending: false }).limit(500),
   ]);
   const [leads, intakes, quiz, magnets, roi] = await Promise.all([
-    supabase.from("leads").select("id,created_at,source,name,email,whatsapp,business_name,business_type,location,score,goal").gte("created_at", sinceIso).order("created_at", { ascending: false }).limit(500),
+    supabase.from("leads").select("id,created_at,source,name,email,whatsapp,business_name,business_type,location,score,goal,challenges,timeline,budget,details").gte("created_at", sinceIso).order("created_at", { ascending: false }).limit(500),
     supabase.from("business_intakes").select("id,created_at,full_name,business_name,business_type,email,whatsapp,city,country,primary_goal,services_needed,growth_budget").gte("created_at", sinceIso).order("created_at", { ascending: false }).limit(500),
     supabase.from("quiz_results").select("id,created_at,name,whatsapp,business_type,score,result_bucket").gte("created_at", sinceIso).order("created_at", { ascending: false }).limit(500),
     supabase.from("lead_magnet_downloads").select("id,created_at,name,whatsapp,email,business_type,resource_title").gte("created_at", sinceIso).order("created_at", { ascending: false }).limit(500),
@@ -193,6 +193,18 @@ async function loadLeads(sinceIso: string): Promise<Lead[]> {
   const s = (v: unknown) => (v === null || v === undefined ? "" : String(v));
   const out: Lead[] = [];
   for (const r of leads.data ?? []) {
+    if (r.source === "quick_enquiry") {
+      const d = (r.details ?? {}) as Record<string, string | null>;
+      const via = d.utm_source ? `via ${d.utm_source}${d.utm_campaign ? `/${d.utm_campaign}` : ""}` : d.referrer ? `from ${d.referrer}` : d.landing ? `landed on ${d.landing}` : "";
+      out.push({
+        id: `l-${r.id}`, kind: "Homepage enquiry",
+        name: s(r.name), business: s(r.business_name), email: s(r.email), whatsapp: s(r.whatsapp),
+        detail: [r.business_type, (r.challenges ?? []).join(", "), r.timeline, r.budget && r.budget !== "Not sure yet" ? `budget ${r.budget}` : "", via].filter(Boolean).join(" · "),
+        created_at: r.created_at,
+        meta: { goal: s(r.goal) || undefined },
+      });
+      continue;
+    }
     out.push({
       id: `l-${r.id}`,
       kind: r.source === "waitlist" ? "Waitlist" : "Analyser",

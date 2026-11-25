@@ -4,6 +4,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { listBlogPosts } from "@/lib/blog-server";
 import { pageHead, breadcrumbLd } from "@/lib/seo";
+import ShowcaseStrip from "@/components/showcase/ShowcaseStrip";
 
 export const Route = createFileRoute("/blog/")({
   component: BlogPage,
@@ -53,6 +54,7 @@ function BlogPage() {
             </div>
           </div>
         </section>
+        <ShowcaseStrip inset min={1} title="Made with our free AI tools" />
       </main>
       <Footer />
     </>

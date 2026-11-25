@@ -1,10 +1,11 @@
+import { SITE_URL } from "@/lib/seo";
 /**
  * robots.txt parsing and matching (RFC 9309): the most specific user-agent group that names us wins,
  * otherwise "*"; within a group the longest matching rule wins and Allow wins a tie. "*" and "$" are
  * supported in paths. Crawl-delay is honoured as a minimum gap between requests.
  */
 export const BOT_TOKEN = "emmaforyouinspiration";
-export const USER_AGENT = "Mozilla/5.0 (compatible; EmmaForYouInspiration/1.0; +https://emmaforyou.lovable.app/inspiration)";
+export const USER_AGENT = `Mozilla/5.0 (compatible; EmmaForYouInspiration/1.0; +${SITE_URL}/inspiration)`;
 
 export interface RobotsRules { rules: { allow: boolean; path: string }[]; crawlDelayMs: number | null; sitemaps: string[]; status: "ok" | "none" | "unreachable" }
 

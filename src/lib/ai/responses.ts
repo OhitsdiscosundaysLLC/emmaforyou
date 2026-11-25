@@ -15,7 +15,13 @@ import { withVisitorLanguage } from "../visitor-language";
  */
 export function createResponsesCall(
   request: Request,
-  config: { provider: AiProvider; model?: string; onResponse?: (response: Response) => Promise<void> },
+  config: {
+    provider: AiProvider; model?: string; onResponse?: (response: Response) => Promise<void>;
+    /** How hard GPT-5/6-family models think before answering (default "low"). */
+    reasoningEffort?: "low" | "medium" | "high";
+    /** Upstream timeout for the whole streamed response (default 120 s). */
+    timeoutMs?: number;
+  },
   messages: ModelMessage[],
   instructions?: string,
 ) {
@@ -29,7 +35,7 @@ export function createResponsesCall(
     apiKey: provider.apiKey,
     headers: provider.headers,
     fetch: async (input, init) => {
-      const response = runIdFetch ? await runIdFetch.fetch(input, init) : await fetch(input, { ...init, signal: init?.signal ?? AbortSignal.timeout(120000) });
+      const response = runIdFetch ? await runIdFetch.fetch(input, init) : await fetch(input, { ...init, signal: init?.signal ?? AbortSignal.timeout(config.timeoutMs ?? 120000) });
       await config.onResponse?.(response);
       return response;
     },
@@ -48,8 +54,8 @@ export function createResponsesCall(
         store: false,
         ...(reasoning
           ? isLovable
-            ? { forceReasoning: true, reasoningEffort: "low", reasoningSummary: "auto", include: ["reasoning.encrypted_content"] }
-            : { reasoningEffort: "low" }
+            ? { forceReasoning: true, reasoningEffort: config.reasoningEffort ?? "low", reasoningSummary: "auto", include: ["reasoning.encrypted_content"] }
+            : { reasoningEffort: config.reasoningEffort ?? "low" }
           : {}),
       },
     },

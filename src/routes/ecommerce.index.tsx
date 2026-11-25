@@ -5,6 +5,7 @@ import { ArrowRight, Rocket, TrendingUp, Search, Stethoscope, Calculator, Users,
 import { pageHead, breadcrumbLd } from "@/lib/seo";
 import { useWorkspace } from "@/components/ecom/ui";
 import { listItems, type Item } from "@/lib/ecom/workspace";
+import ShowcaseStrip from "@/components/showcase/ShowcaseStrip";
 
 export const Route = createFileRoute("/ecommerce/")({
   head: () => pageHead({
@@ -77,6 +78,8 @@ function Hub() {
           </Link></li>
         ))}
       </ul>
+
+      <div className="mt-10"><ShowcaseStrip inset min={1} title="What visitors made with our AI tools" /></div>
 
       <section className="mt-10 grid gap-4 rounded-2xl border border-border bg-card p-5 sm:grid-cols-3">
         <div><h2 className="font-display text-base font-bold"><KineticText text="What these tools can see" base={30} /></h2><p className="mt-1 text-sm text-muted-foreground">Public store pages, competitors' public product data, our tracked industry news, and any numbers or exports you provide.</p></div>

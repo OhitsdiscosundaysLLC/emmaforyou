@@ -6,8 +6,9 @@
  */
 import { detectPlatform, type Adapter } from "./platforms";
 import { productLinks, readPage, type PageFacts } from "./extract";
+import { SITE_URL } from "@/lib/seo";
 
-const UA = "Mozilla/5.0 (compatible; EmmaForYouStoreAudit/1.0; +https://emmaforyou.lovable.app/ecommerce)";
+const UA = `Mozilla/5.0 (compatible; EmmaForYouStoreAudit/1.0; +${SITE_URL}/ecommerce)`;
 const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36";
 const MAX_BYTES = 2_500_000;
 

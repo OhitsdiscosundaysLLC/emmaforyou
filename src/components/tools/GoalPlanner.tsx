@@ -8,6 +8,7 @@ import { LeadCapture } from "./LeadCapture";
 import { track } from "@/lib/analytics";
 import { useI18n } from "@/lib/i18n";
 import { ShowcaseOptIn, ShowcasePublished, publishToShowcase, useShowcaseChoice } from "../showcase/ShowcaseOptIn";
+import { SITE_URL } from "@/lib/seo";
 
 export default function GoalPlanner() {
   const [form, setForm] = useState<PlanRequest>({ role: ROLES[0], goal: "", why: "", now: "", hours: HOURS[1], obstacle: OBSTACLES[0], startDate: "" });
@@ -160,7 +161,7 @@ export default function GoalPlanner() {
               <ul className="mt-3 space-y-3 text-sm">{plan.risks.map((r) => <li key={r.risk}><strong>{r.risk}</strong><span className="block text-muted-foreground">{r.plan}</span></li>)}</ul>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">Created with the EmmaForYou 90-day goal planner · emmaforyou.lovable.app/goal-planner</p>
+          <p className="text-xs text-muted-foreground">Created with the EmmaForYou 90-day goal planner · {SITE_URL.replace(/^https?:\/\//, "")}/goal-planner</p>
 
           <div className="no-print flex flex-wrap gap-3">
             <button onClick={downloadIcs} className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-3 text-sm font-semibold text-background"><CalendarPlus className="h-4 w-4" /> Add the 12 weeks to my calendar</button>

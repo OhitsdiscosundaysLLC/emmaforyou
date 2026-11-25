@@ -1,3 +1,4 @@
+import { SITE_URL } from "@/lib/seo";
 /**
  * Pure decision logic for the agent team (no I/O), shared by the worker and unit tests:
  * relevance scoring and routing, link sanitising, duplicate fingerprints, safety screens.
@@ -37,7 +38,7 @@ export function candidates(scored: ReturnType<typeof scoreAgents>): { primary: A
 }
 
 /** Keep only links to real pages: internal paths that exist and the site's own domain. Unknown links are removed (text kept). */
-export function sanitizeLinks(text: string, allowed: Set<string>, siteHost = "emmaforyou.lovable.app"): { text: string; removed: string[] } {
+export function sanitizeLinks(text: string, allowed: Set<string>, siteHost = new URL(SITE_URL).host): { text: string; removed: string[] } {
   const removed: string[] = [];
   const isOk = (path: string) => { const p = path.replace(/[?#].*$/, "").replace(/\/+$/, "") || "/"; return allowed.has(p); };
   let out = text.replace(/\[([^\]]{1,120})\]\(([^)\s]{1,300})\)/g, (_m, label: string, href: string) => {
